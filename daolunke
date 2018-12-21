@@ -1,1 +1,131 @@
-55d11
+#include <SoftwareSerial.h>
+#include <avr/sleep.h>
+#include <avr/power.h>
+#include <U8glib.h>//使用OLED需要包含这个头文件
+#define INTERVAL_LCD 20 //定义OLED刷新时间间隔 
+unsigned long lcd_time = millis(); //OLED刷新时间计时器
+U8GLIB_SSD1306_128X64 u8g(U8G_I2C_OPT_NONE); //设置OLED型号 
+//-------字体设置，大、中、小
+#define setFont_L u8g.setFont(u8g_font_7x13)
+#define setFont_M u8g.setFont(u8g_font_fixed_v0r)
+#define setFont_S u8g.setFont(u8g_font_fixed_v0r)
+#define setFont_SS u8g.setFont(u8g_font_fub25n)
+
+#include "OurSpark.h"//引用头文件，将OurSpark.h头文件放到项目同一文件夹内
+
+ColorLEDController LEDController1(2, 6);  //实例化一个ColorLEDController对象
+//参数中第一个2表示最大级联ColorLED个数，第二个6表示使用D6口控制LED灯。
+int pin2 = 2;
+long previousMillis = 0;        // 存储LED最后一次的更新
+long interval = 50000;           // 闪烁的时间间隔（毫秒）
+unsigned long currentMillis=0;
+
+String item;
+
+String currentInfo="";
+
+SoftwareSerial mySerial(4, 5);   //根据实际模块上的跳线，选择对应端口
+
+#define my_Serial  mySerial   //声明软串口
+void pin2Interrupt(void) {
+    /* 中断唤醒 */
+ 
+    /*当中断引脚为低电平时关闭中断*/
+    Serial.println("wake up!!!");
+    detachInterrupt(0);
+}
+void enterSleep(void) {
+
+    attachInterrupt(0, pin2Interrupt, LOW);
+    delay(100);
+    set_sleep_mode(SLEEP_MODE_PWR_DOWN);
+    sleep_enable();
+    sleep_mode();
+    sleep_disable();
+}
+
+void setup()
+
+{
+  item = "";
+
+  my_Serial.begin(9600);
+   pinMode(pin2, INPUT);
+
+  Serial.begin(9600);
+   Serial.println("Initialisation complete.");
+
+}
+
+void loop()
+
+{
+  if (my_Serial.available() > 0) {
+
+   currentInfo = my_Serial.readStringUntil('\n');  //接收手机发送的数据
+
+    Serial.println(currentInfo);          //手机发送过来的数据串口返回
+  }
+  if (Serial.available() > 0) {
+
+    item = Serial.readString();       //接收PC端串口数据
+
+    my_Serial.println(item);          //串口数据发给手机
+    if (item.startsWith("breath"))
+    { LEDController1.ShowColor(0,255,0,0); //第一个参数表示点亮0号灯，让其显示红光
+  delay(1000);  //延迟1秒输出
+  
+  LEDController1.ShowColor(0,0,255,0); //第一个参数表示点亮0号灯，让其显示绿光
+  delay(1000);  //延迟1秒输出
+  
+  LEDController1.ShowColor(0,0,0,255); //第一个参数表示点亮0号灯，让其显示蓝光
+  delay(1000);  //延迟1秒输出
+ 
+  LEDController1.ShowColor(0,0,0,0);  //熄灭
+  delay(1000);  //延迟1秒输出
+      
+      }
+      if (item.startsWith("red"))
+      {
+        LEDController1.ShowColor(0,255,0,0); //第一个参数表示点亮0号灯，让其显示红光
+  delay(1000);  //延迟1秒输出
+        }
+         if (item.startsWith("green")) 
+         {
+          LEDController1.ShowColor(0,0,255,0); //第一个参数表示点亮0号灯，让其显示绿光
+         }
+  delay(1000);  //延迟1秒输出
+  }
+         if (item.startsWith("blue"))
+         {
+          LEDController1.ShowColor(0,0,0,255); //第一个参数表示点亮0号灯，让其显示蓝光
+  delay(1000);  //延迟1秒输出
+  }
+   currentMillis = millis();
+    Serial.print("Awake for ");
+    Serial.print(currentMillis - previousMillis, DEC);
+    Serial.println(" second");
+    delay(1000);
+
+    if (item.startsWith("open")) {
+      previousMillis = currentMillis;
+    }
+
+    if(currentMillis - previousMillis > interval) {
+      previousMillis = currentMillis; 
+      Serial.println("Entering sleep");
+      enterSleep();
+    }
+  if(currentMillis<previousMillis)
+    previousMillis=currentMillis=0;
+
+    Serial.println(item);
+ u8g.firstPage();
+ do {
+ setFont_L;
+ u8g.setPrintPos(0, 10);
+ u8g.print(item);
+
+ }while( u8g.nextPage() );
+}
+
